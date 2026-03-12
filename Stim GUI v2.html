@@ -1,0 +1,432 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>Stim Box Controller</title>
+  <style>
+    body { font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; margin: 20px; max-width: 980px; }
+    h1 { font-size: 1.5rem; margin: 0 0 6px; }
+    .sub { color: #444; margin: 0 0 14px; }
+    .card { border: 1px solid #ddd; border-radius: 14px; padding: 16px; margin: 14px 0; background: #fff; }
+    .steps ol { margin: 8px 0 0 18px; }
+    .steps li { margin: 6px 0; }
+    .row { display: flex; gap: 16px; flex-wrap: wrap; align-items: center; margin: 10px 0; }
+    .grow { flex: 1 1 360px; min-width: 280px; }
+    label { display: flex; justify-content: space-between; gap: 12px; font-weight: 650; }
+    .val { font-weight: 700; }
+    input[type="range"] { width: 100%; }
+    button { padding: 10px 14px; border-radius: 12px; border: 1px solid #ccc; background: #f7f7f7; cursor: pointer; }
+    button:disabled { opacity: 0.45; cursor: not-allowed; }
+    button.primary { border-color: #1b6; }
+    button.danger { border-color: #c33; }
+    .pill { display: inline-flex; align-items: center; gap: 8px; padding: 8px 12px; border-radius: 999px; border: 1px solid #ddd; background: #fafafa; }
+    .dot { width: 10px; height: 10px; border-radius: 50%; background: #999; }
+    .dot.green { background: #1b6; }
+    .dot.red { background: #c33; }
+    .dot.gray { background: #999; }
+    .statusline { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+    .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; }
+    pre { white-space: pre-wrap; border: 1px solid #ddd; border-radius: 14px; padding: 12px; background: #fafafa; max-height: 220px; overflow: auto; }
+    .tiny { font-size: 0.9rem; color: #444; }
+    .checkline { display:flex; gap:10px; align-items:flex-start; margin-top:10px; }
+    .checkline input { transform: translateY(2px); }
+  </style>
+</head>
+<body>
+  <h1>Stim Box Controller (v2.0)</h1>
+
+  <div class="card steps">
+    <div style="font-weight:800;">Before you start</div>
+    <ol>
+      <li>Unplug your laptop from the wall (run on battery power). Open this page in Chrome or Edge.</li>
+      <li>Use the provided USB cable to connect the Stim Box to your laptop.</li>
+
+      <li>
+        Put the two electrodes on the same forearm, hand or wrist, about 3–6 inches (8–15 cm) apart.
+
+        <div style="margin-top:8px; margin-left:18px;">
+          <div>
+            <strong>Warning:</strong> Do not place electrodes on opposite arms, across the chest, neck, head,
+            or in any way that could cross the heart. If you place electrodes across your body, you will not be allowed to complete the activity.
+          </div>
+
+          <div style="margin-top:6px;">
+            <strong>Warning:</strong> Do not participate if you have any implanted electronic medical device
+            (for example: pacemaker, ICD, neurostimulator, cochlear implant, insulin pump)
+            or if you have metal implants near where the electrodes would go.
+            If you are unsure, stop and ask the instructor before connecting electrodes or turning on the Stim Box.
+          </div>
+        </div>
+      </li>
+
+      <!-- Moved checkbox to immediately after Step 4 -->
+      <li style="list-style: none; margin-top: 10px;">
+        <div class="checkline">
+          <input id="confirmElectrodes" type="checkbox" />
+          <div>
+            <strong>I confirm that the laptop is unplugged from the wall and the electrodes are placed safely, as described above.</strong>
+          </div>
+        </div>
+      </li>
+
+      <li>Connect the 12V battery to the Stim Box and switch the battery to “|” (ON).</li>
+
+      <li>Press Connect, select the device in the pop-up, and wait until it says Connected.</li>
+      <li>Now turn ON the power switch on the Stim Box.</li>
+    </ol>
+  </div>
+
+  <div class="card">
+    <div class="statusline" style="margin-top:12px;">
+      <span class="pill"><span id="connDot" class="dot gray"></span><span id="connText">Disconnected</span></span>
+      <span class="pill"><span id="stimDot" class="dot gray"></span><span id="stimText">Stim Off</span></span>
+    </div>
+
+    <div class="row" style="margin-top:12px;">
+      <button id="connectBtn" class="primary" disabled>Connect</button>
+      <button id="disconnectBtn" disabled>Disconnect</button>
+      <button id="startBtn" class="primary" disabled>Start</button>
+      <button id="stopBtn" class="danger" disabled>Stop</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="row">
+      <div class="grow">
+        <label>
+          <span>Amplitude</span>
+          <span class="val"><span id="ampVal">2.0</span> mA</span>
+        </label>
+        <input id="amp" type="range" min="0" max="12.0" step="0.1" value="2.0">
+      </div>
+
+      <div class="grow">
+        <label>
+          <span>Pulse Width</span>
+          <span class="val"><span id="pwVal">200</span> µs</span>
+        </label>
+        <input id="pw" type="range" min="0" max="1200" step="25" value="200">
+      </div>
+    </div>
+
+    <div class="row">
+      <div class="grow">
+        <label>
+          <span>Frequency</span>
+          <span class="val"><span id="freqVal">30</span> Hz</span>
+        </label>
+        <input id="freq" type="range" min="0" max="255" step="1" value="30">
+      </div>
+
+      <div class="grow">
+        <label>
+          <span>Duration</span>
+          <span class="val"><span id="durVal">2.0</span> s</span>
+        </label>
+        <input id="dur" type="range" min="0" max="10" step="0.1" value="2.0">
+      </div>
+    </div>
+
+    <div id="strongWarn" style="display:none; border:1px solid #c99; background:#fff7f7; padding:12px; border-radius:14px; margin-top:12px;">
+      <strong>Warning:</strong> These stimulation parameters may feel strong or painful.
+    </div>
+
+    <p class="tiny">Tip: You can press Start again to update settings while running.</p>
+  </div>
+
+  <div class="card">
+    <div style="font-weight:800;">Log</div>
+    <pre id="log" class="mono"></pre>
+  </div>
+
+<script>
+  let port = null;
+  let writer = null;
+  let reader = null;
+  let autoStopTimer = null;
+
+  const logEl = document.getElementById("log");
+
+  const connDot = document.getElementById("connDot");
+  const connText = document.getElementById("connText");
+  const stimDot = document.getElementById("stimDot");
+  const stimText = document.getElementById("stimText");
+
+  const confirmElectrodes = document.getElementById("confirmElectrodes");
+
+  const connectBtn = document.getElementById("connectBtn");
+  const disconnectBtn = document.getElementById("disconnectBtn");
+  const startBtn = document.getElementById("startBtn");
+  const stopBtn = document.getElementById("stopBtn");
+
+  const amp = document.getElementById("amp");
+  const pw = document.getElementById("pw");
+  const freq = document.getElementById("freq");
+  const dur = document.getElementById("dur");
+
+  const ampVal = document.getElementById("ampVal");
+  const pwVal = document.getElementById("pwVal");
+  const freqVal = document.getElementById("freqVal");
+  const durVal = document.getElementById("durVal");
+
+  const strongWarnEl = document.getElementById("strongWarn");
+  const STRONG_THRESHOLD = 750;
+
+  function log(msg) {
+    const ts = new Date().toLocaleTimeString();
+    logEl.textContent += `[${ts}] ${msg}\n`;
+    logEl.scrollTop = logEl.scrollHeight;
+  }
+
+  function setConnectedUI(isConnected) {
+    connectBtn.disabled = isConnected || !confirmElectrodes.checked;
+    disconnectBtn.disabled = !isConnected;
+    startBtn.disabled = !isConnected;
+    stopBtn.disabled = !isConnected;
+
+    connDot.className = "dot " + (isConnected ? "green" : "gray");
+    connText.textContent = isConnected ? "Connected" : "Disconnected";
+  }
+
+  function setStimUI(on) {
+    stimDot.className = "dot " + (on ? "red" : "gray");
+    stimText.textContent = on ? "Stim On" : "Stim Off";
+  }
+
+  function clampByte(n) {
+    n = Math.floor(Number(n));
+    if (!Number.isFinite(n)) return 0;
+    if (n < 0) return 0;
+    if (n > 255) return 255;
+    return n;
+  }
+
+  function getAmp_mA() {
+    return Math.round(Number(amp.value) * 10) / 10; // 0.1 mA resolution
+  }
+
+  function getPW_us() {
+    return Math.round(Number(pw.value) / 25) * 25; // 25 us resolution
+  }
+
+  function updateStrongWarning() {
+    const metric = getAmp_mA() * getPW_us(); // mA * us
+    strongWarnEl.style.display = (metric > STRONG_THRESHOLD) ? "block" : "none";
+  }
+
+  // Matches MATLAB encoding for 1-channel use:
+  // [pot1, pw1, 0, 0, 0, 0, freq, 0]
+  function encodePacket(amp_mA, pw_us, freq_hz) {
+    const pot1 = clampByte(Math.floor(Number(amp_mA) * 16.25));
+    const pw1  = clampByte(Math.floor(Number(pw_us) * 0.2));
+    const f    = clampByte(Math.floor(Number(freq_hz)));
+    return new Uint8Array([pot1, pw1, 0, 0, 0, 0, f, 0]);
+  }
+
+  function bytesToUint32LE(u8_4) {
+    if (u8_4.length < 4) return null;
+    const view = new DataView(u8_4.buffer, u8_4.byteOffset, 4);
+    return view.getUint32(0, true);
+  }
+
+  // REAL timeout for a single read() call
+  async function readOnceWithTimeout(timeoutMs) {
+    return await Promise.race([
+      reader.read(),
+      new Promise(resolve => setTimeout(() => resolve({ value: null, done: false, timeout: true }), timeoutMs))
+    ]);
+  }
+
+  // Reads up to n bytes, but will not hang forever.
+  async function readUpToN(n, totalTimeoutMs = 400) {
+    const deadline = Date.now() + totalTimeoutMs;
+    let out = [];
+
+    while (out.length < n && Date.now() < deadline) {
+      const remaining = Math.max(10, deadline - Date.now());
+      const result = await readOnceWithTimeout(remaining);
+
+      if (result && result.timeout) break;
+      if (!result) break;
+
+      const { value, done } = result;
+      if (done) break;
+      if (value && value.length) out.push(...Array.from(value));
+      else break; // nothing received during this window
+    }
+
+    return new Uint8Array(out.slice(0, n));
+  }
+
+  async function writeBytes(packet8) {
+    await writer.write(packet8);
+  }
+
+  // For logging only (does not block control flow).
+  async function tryReadAndLogReply() {
+    try {
+      const resp = await readUpToN(4, 400);
+      const respArr = Array.from(resp);
+
+      if (respArr.length) {
+        const t = bytesToUint32LE(resp);
+        if (t !== null) log(`Reply: ${respArr.join(",")} (value ${t})`);
+        else log(`Reply: ${respArr.join(",")}`);
+      } else {
+        log("Reply: —");
+      }
+    } catch (e) {
+      log("Reply read error: " + e);
+    }
+  }
+
+  async function stopStim() {
+    clearTimeout(autoStopTimer);
+    autoStopTimer = null;
+
+    await writeBytes(new Uint8Array([0,0,0,0,0,0,0,0]));
+    setStimUI(false);
+
+    // read/log reply if present, but don't hang
+    await tryReadAndLogReply();
+  }
+
+  async function connectHandshake() {
+    log("Connecting...");
+    await stopStim();
+    await new Promise(r => setTimeout(r, 60));
+    await stopStim();
+    log("Connected.");
+  }
+
+  function refreshSliderLabels() {
+    ampVal.textContent = getAmp_mA().toFixed(1);
+    pwVal.textContent = String(getPW_us());
+    freqVal.textContent = String(Math.round(Number(freq.value)));
+    durVal.textContent = Number(dur.value).toFixed(1);
+    updateStrongWarning();
+  }
+
+  [amp, pw, freq, dur].forEach(el => el.addEventListener("input", refreshSliderLabels));
+  refreshSliderLabels();
+
+  // Initialize Connect button based on checkbox state
+  connectBtn.disabled = !confirmElectrodes.checked;
+
+  confirmElectrodes.addEventListener("change", () => {
+    if (connText.textContent !== "Connected") {
+      connectBtn.disabled = !confirmElectrodes.checked;
+    }
+  });
+
+  connectBtn.addEventListener("click", async () => {
+    if (!("serial" in navigator)) {
+      alert("This requires Chrome or Edge on a laptop.");
+      return;
+    }
+    try {
+      port = await navigator.serial.requestPort();
+      await port.open({ baudRate: 115200 });
+      writer = port.writable.getWriter();
+      reader = port.readable.getReader();
+
+      confirmElectrodes.disabled = true;
+
+      setConnectedUI(true);
+      setStimUI(false);
+      await connectHandshake();
+    } catch (err) {
+      log("Connect error: " + err);
+      setConnectedUI(false);
+      setStimUI(false);
+      port = null; writer = null; reader = null;
+
+      confirmElectrodes.disabled = false;
+      connectBtn.disabled = !confirmElectrodes.checked;
+
+      alert("Could not connect. Make sure the USB cable is plugged in and try again.");
+    }
+  });
+
+  disconnectBtn.addEventListener("click", async () => {
+    try {
+      if (writer && reader) {
+        try { await stopStim(); } catch (_) {}
+      }
+      if (reader) {
+        try { await reader.cancel(); } catch (_) {}
+        reader.releaseLock();
+      }
+      if (writer) writer.releaseLock();
+      if (port) await port.close();
+      log("Disconnected.");
+    } catch (err) {
+      log("Disconnect error: " + err);
+    } finally {
+      clearTimeout(autoStopTimer);
+      autoStopTimer = null;
+      port = null; writer = null; reader = null;
+      setConnectedUI(false);
+      setStimUI(false);
+
+      confirmElectrodes.disabled = false;
+      connectBtn.disabled = !confirmElectrodes.checked;
+    }
+  });
+
+  // Start always schedules duration on the first press.
+  // It no longer blocks on waiting for a reply.
+  startBtn.addEventListener("click", async () => {
+    try {
+      clearTimeout(autoStopTimer);
+      autoStopTimer = null;
+
+      const amp_mA = getAmp_mA();
+      const pw_us  = getPW_us();
+      const pkt = encodePacket(amp_mA, pw_us, freq.value);
+
+      const metric = amp_mA * pw_us;
+      if (metric > STRONG_THRESHOLD) {
+        log(`WARN: strong settings (amp*pw=${metric.toFixed(1)} > ${STRONG_THRESHOLD})`);
+      }
+
+      // Write first (this is what actually starts stim)
+      await writeBytes(pkt);
+
+      // Update UI immediately
+      setStimUI(true);
+
+      // Schedule auto-stop immediately
+      const seconds = Number(dur.value);
+      if (Number.isFinite(seconds) && seconds > 0) {
+        autoStopTimer = setTimeout(() => {
+          stopStim().then(() => log("Auto stop triggered after " + seconds + " seconds."))
+                    .catch(e => log("Auto-stop error: " + e));
+        }, Math.floor(seconds * 1000));
+      }
+
+      // Log response if/when it arrives, but don’t block start behavior
+      await tryReadAndLogReply();
+
+    } catch (err) {
+      log("Start error: " + err);
+      alert("Could not send settings. Try Disconnect and Connect again.");
+    }
+  });
+
+  stopBtn.addEventListener("click", async () => {
+    try {
+      await stopStim();
+    } catch (err) {
+      log("Stop error: " + err);
+    }
+  });
+
+  // Initial UI
+  setConnectedUI(false);
+  setStimUI(false);
+  log("Ready.");
+</script>
+</body>
+</html>
