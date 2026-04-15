@@ -35,6 +35,13 @@
     }
 
     input[type="range"] { width: 100%; flex: 1; }
+    input[type="number"] {
+      width: 130px;
+      padding: 8px 10px;
+      border-radius: 10px;
+      border: 1px solid #ccc;
+      font: inherit;
+    }
 
     button { padding: 10px 14px; border-radius: 12px; border: 1px solid #ccc; background: #f7f7f7; cursor: pointer; }
     button:disabled { opacity: 0.45; cursor: not-allowed; }
@@ -47,10 +54,18 @@
     .dot.gray { background: #999; }
     .statusline { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
     .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; }
-    pre { white-space: pre-wrap; border: 1px solid #ddd; border-radius: 14px; padding: 12px; background: #fafafa; max-height: 220px; overflow: auto; }
+    pre { white-space: pre-wrap; border: 1px solid #ddd; border-radius: 14px; padding: 12px; background: #fafafa; max-height: 260px; overflow: auto; }
     .tiny { font-size: 0.9rem; color: #444; }
     .checkline { display:flex; gap:10px; align-items:flex-start; margin-top:10px; }
     .checkline input { transform: translateY(2px); }
+    .fieldRow {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      margin-top: 6px;
+      flex-wrap: wrap;
+    }
   </style>
 </head>
 <body>
@@ -65,7 +80,7 @@
       <li>Use the provided USB cable to connect the Stim Box to your laptop.</li>
 
       <li>
-        Put the two electrodes on the same forearm, 2–6 inches (6–15 cm) apart.
+        Put the two electrodes on the same forearm, 3–6 inches (8–15 cm) apart.
 
         <div style="margin-top:8px; margin-left:18px;">
           <div>
@@ -121,7 +136,7 @@
         </label>
         <div class="sliderRow">
           <button id="ampMinus" class="sliderBtn" type="button">−</button>
-          <input id="amp" type="range" min="0" max="14.0" step="0.1" value="2.0">
+          <input id="amp" type="range" min="0" max="15.0" step="0.1" value="2.0">
           <button id="ampPlus" class="sliderBtn" type="button">+</button>
         </div>
       </div>
@@ -154,22 +169,46 @@
 
       <div class="grow">
         <label>
-          <span>Duration</span>
-          <span class="val"><span id="durVal">2.0</span> s</span>
+          <span>Duty Cycle</span>
+          <span class="val"><span id="dutyVal">100</span>%</span>
         </label>
         <div class="sliderRow">
-          <button id="durMinus" class="sliderBtn" type="button">−</button>
-          <input id="dur" type="range" min="0" max="10" step="0.5" value="2.0">
-          <button id="durPlus" class="sliderBtn" type="button">+</button>
+          <button id="dutyMinus" class="sliderBtn" type="button">−</button>
+          <input id="duty" type="range" min="0" max="100" step="5" value="100">
+          <button id="dutyPlus" class="sliderBtn" type="button">+</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="row">
+      <div class="grow">
+        <label for="durInput">
+          <span>Total Duration</span>
+          <span class="val"><span id="durVal">150.0</span> s</span>
+        </label>
+        <div class="fieldRow">
+          <input id="durInput" type="number" min="0" max="600" step="0.5" value="150.0">
+          <span class="tiny">0 to 600 s</span>
+        </div>
+      </div>
+
+      <div class="grow">
+        <label for="periodInput">
+          <span>Cycle Period</span>
+          <span class="val"><span id="periodVal">10.0</span> s</span>
+        </label>
+        <div class="fieldRow">
+          <input id="periodInput" type="number" min="1" max="10" step="0.5" value="10.0">
+          <span class="tiny">1 to 10 s</span>
         </div>
       </div>
     </div>
 
     <div id="strongWarn" style="display:none; border:1px solid #c99; background:#fff7f7; padding:12px; border-radius:14px; margin-top:12px;">
-      <strong>Warning:</strong> These stimulation parameters may feel strong.
+      <strong>Warning:</strong> These stimulation parameters may feel strong or painful.
     </div>
 
-    <p class="tiny">Tip: You can press Start again to update settings while running.</p>
+    <p class="tiny">Tip: Press Start again to update settings while running.</p>
   </div>
 
   <div class="card">
@@ -181,7 +220,10 @@
   let port = null;
   let writer = null;
   let reader = null;
-  let autoStopTimer = null;
+
+  let phaseTimer = null;
+  let experimentEndTimer = null;
+  let runState = null; // null or object describing active run
 
   const logEl = document.getElementById("log");
 
@@ -200,7 +242,9 @@
   const amp = document.getElementById("amp");
   const pw = document.getElementById("pw");
   const freq = document.getElementById("freq");
-  const dur = document.getElementById("dur");
+  const duty = document.getElementById("duty");
+  const durInput = document.getElementById("durInput");
+  const periodInput = document.getElementById("periodInput");
 
   const ampMinus = document.getElementById("ampMinus");
   const ampPlus = document.getElementById("ampPlus");
@@ -208,16 +252,18 @@
   const pwPlus = document.getElementById("pwPlus");
   const freqMinus = document.getElementById("freqMinus");
   const freqPlus = document.getElementById("freqPlus");
-  const durMinus = document.getElementById("durMinus");
-  const durPlus = document.getElementById("durPlus");
+  const dutyMinus = document.getElementById("dutyMinus");
+  const dutyPlus = document.getElementById("dutyPlus");
 
   const ampVal = document.getElementById("ampVal");
   const pwVal = document.getElementById("pwVal");
   const freqVal = document.getElementById("freqVal");
+  const dutyVal = document.getElementById("dutyVal");
   const durVal = document.getElementById("durVal");
+  const periodVal = document.getElementById("periodVal");
 
   const strongWarnEl = document.getElementById("strongWarn");
-  const STRONG_THRESHOLD = 1200;
+  const STRONG_THRESHOLD = 750;
 
   function log(msg) {
     const ts = new Date().toLocaleTimeString();
@@ -268,8 +314,20 @@
     return roundToStep(Number(freq.value), 5);
   }
 
+  function getDuty_pct() {
+    return roundToStep(Number(duty.value), 5);
+  }
+
   function getDur_s() {
-    return roundToStep(Number(dur.value), 0.5);
+    const raw = Number(durInput.value);
+    const clipped = clampToRange(roundToStep(raw, 0.5), 0, 600);
+    return Number.isFinite(clipped) ? clipped : 0;
+  }
+
+  function getPeriod_s() {
+    const raw = Number(periodInput.value);
+    const clipped = clampToRange(roundToStep(raw, 0.5), 1, 10);
+    return Number.isFinite(clipped) ? clipped : 10;
   }
 
   function setSliderValue(slider, value, step) {
@@ -283,7 +341,13 @@
   function nudgeSlider(slider, delta, step) {
     const current = Number(slider.value);
     setSliderValue(slider, current + delta, step);
-    refreshSliderLabels();
+    refreshControls();
+  }
+
+  function normalizeNumberInput(inputEl, step, min, max) {
+    const raw = Number(inputEl.value);
+    const normalized = clampToRange(roundToStep(raw, step), min, max);
+    inputEl.value = normalized.toFixed(1);
   }
 
   function updateStrongWarning() {
@@ -354,39 +418,156 @@
     }
   }
 
-  async function stopStim() {
-    clearTimeout(autoStopTimer);
-    autoStopTimer = null;
+  async function sendStimPacket(packet) {
+    await writeBytes(packet);
+    setStimUI(true);
+    await tryReadAndLogReply();
+  }
 
+  async function sendZeroPacket() {
     await writeBytes(new Uint8Array([0,0,0,0,0,0,0,0]));
     setStimUI(false);
     await tryReadAndLogReply();
   }
 
+  function clearRunTimers() {
+    if (phaseTimer) {
+      clearTimeout(phaseTimer);
+      phaseTimer = null;
+    }
+    if (experimentEndTimer) {
+      clearTimeout(experimentEndTimer);
+      experimentEndTimer = null;
+    }
+  }
+
+  async function stopStim(reason = "Stopped.") {
+    clearRunTimers();
+    runState = null;
+    await sendZeroPacket();
+    log(reason);
+  }
+
   async function connectHandshake() {
     log("Connecting...");
-    await stopStim();
+    await sendZeroPacket();
     await new Promise(r => setTimeout(r, 60));
-    await stopStim();
+    await sendZeroPacket();
     log("Connected.");
   }
 
-  function refreshSliderLabels() {
+  function refreshControls() {
     setSliderValue(amp, amp.value, 0.1);
     setSliderValue(pw, pw.value, 25);
     setSliderValue(freq, freq.value, 5);
-    setSliderValue(dur, dur.value, 0.5);
+    setSliderValue(duty, duty.value, 5);
+
+    normalizeNumberInput(durInput, 0.5, 0, 600);
+    normalizeNumberInput(periodInput, 0.5, 1, 10);
 
     ampVal.textContent = getAmp_mA().toFixed(1);
     pwVal.textContent = String(getPW_us());
     freqVal.textContent = String(getFreq_Hz());
+    dutyVal.textContent = String(getDuty_pct());
     durVal.textContent = getDur_s().toFixed(1);
+    periodVal.textContent = getPeriod_s().toFixed(1);
 
     updateStrongWarning();
   }
 
-  [amp, pw, freq, dur].forEach(el => el.addEventListener("input", refreshSliderLabels));
-  refreshSliderLabels();
+  function schedulePhaseChange(state, delayMs, nextPhase) {
+    phaseTimer = setTimeout(async () => {
+      if (!runState || runState.runId !== state.runId) return;
+
+      const elapsed = Date.now() - state.startTime;
+      const remainingMs = state.totalDurationMs - elapsed;
+
+      if (remainingMs <= 0) return;
+
+      try {
+        if (nextPhase === "off") {
+          await sendZeroPacket();
+          log("Duty cycle: OFF phase.");
+        } else {
+          await sendStimPacket(state.packet);
+          log("Duty cycle: ON phase.");
+        }
+      } catch (err) {
+        log("Duty cycle error: " + err);
+        await stopStim("Stopped due to duty cycle error.");
+        return;
+      }
+
+      const nextDelay = nextPhase === "off" ? state.offTimeMs : state.onTimeMs;
+      const followingPhase = nextPhase === "off" ? "on" : "off";
+
+      if (nextDelay > 0) {
+        schedulePhaseChange(state, Math.min(nextDelay, Math.max(0, state.totalDurationMs - (Date.now() - state.startTime))), followingPhase);
+      }
+    }, delayMs);
+  }
+
+  async function startDutyCycledRun(packet, totalDurationSec, dutyPct, periodSec) {
+    clearRunTimers();
+
+    const totalDurationMs = Math.floor(totalDurationSec * 1000);
+    const onTimeMs = Math.floor(periodSec * (dutyPct / 100) * 1000);
+    const offTimeMs = Math.floor(periodSec * (1 - dutyPct / 100) * 1000);
+
+    const state = {
+      runId: Date.now() + Math.random(),
+      packet,
+      startTime: Date.now(),
+      totalDurationMs,
+      onTimeMs,
+      offTimeMs
+    };
+    runState = state;
+
+    if (totalDurationMs <= 0) {
+      await stopStim("Duration was 0 s. No stimulation delivered.");
+      return;
+    }
+
+    if (dutyPct <= 0) {
+      await sendZeroPacket();
+      experimentEndTimer = setTimeout(async () => {
+        if (!runState || runState.runId !== state.runId) return;
+        await stopStim("Duty cycle 0%. Total duration complete.");
+      }, totalDurationMs);
+      log(`Started run: duty 0%, no stimulation for ${totalDurationSec.toFixed(1)} s.`);
+      return;
+    }
+
+    if (dutyPct >= 100) {
+      await sendStimPacket(packet);
+      experimentEndTimer = setTimeout(async () => {
+        if (!runState || runState.runId !== state.runId) return;
+        await stopStim(`Total duration complete (${totalDurationSec.toFixed(1)} s).`);
+      }, totalDurationMs);
+      log(`Started run: constant stimulation for ${totalDurationSec.toFixed(1)} s.`);
+      return;
+    }
+
+    await sendStimPacket(packet);
+    log(`Started run: ${dutyPct}% duty cycle, ${periodSec.toFixed(1)} s period, total ${totalDurationSec.toFixed(1)} s.`);
+
+    experimentEndTimer = setTimeout(async () => {
+      if (!runState || runState.runId !== state.runId) return;
+      await stopStim(`Total duration complete (${totalDurationSec.toFixed(1)} s).`);
+    }, totalDurationMs);
+
+    if (onTimeMs > 0) {
+      schedulePhaseChange(state, Math.min(onTimeMs, totalDurationMs), "off");
+    }
+  }
+
+  [amp, pw, freq, duty].forEach(el => el.addEventListener("input", refreshControls));
+  [durInput, periodInput].forEach(el => {
+    el.addEventListener("input", refreshControls);
+    el.addEventListener("change", refreshControls);
+  });
+  refreshControls();
 
   ampMinus.addEventListener("click", () => nudgeSlider(amp, -0.1, 0.1));
   ampPlus.addEventListener("click", () => nudgeSlider(amp, 0.1, 0.1));
@@ -397,8 +578,8 @@
   freqMinus.addEventListener("click", () => nudgeSlider(freq, -5, 5));
   freqPlus.addEventListener("click", () => nudgeSlider(freq, 5, 5));
 
-  durMinus.addEventListener("click", () => nudgeSlider(dur, -0.5, 0.5));
-  durPlus.addEventListener("click", () => nudgeSlider(dur, 0.5, 0.5));
+  dutyMinus.addEventListener("click", () => nudgeSlider(duty, -5, 5));
+  dutyPlus.addEventListener("click", () => nudgeSlider(duty, 5, 5));
 
   connectBtn.disabled = !confirmElectrodes.checked;
 
@@ -440,7 +621,7 @@
   disconnectBtn.addEventListener("click", async () => {
     try {
       if (writer && reader) {
-        try { await stopStim(); } catch (_) {}
+        try { await stopStim("Disconnected."); } catch (_) {}
       }
       if (reader) {
         try { await reader.cancel(); } catch (_) {}
@@ -448,12 +629,11 @@
       }
       if (writer) writer.releaseLock();
       if (port) await port.close();
-      log("Disconnected.");
     } catch (err) {
       log("Disconnect error: " + err);
     } finally {
-      clearTimeout(autoStopTimer);
-      autoStopTimer = null;
+      clearRunTimers();
+      runState = null;
       port = null; writer = null; reader = null;
       setConnectedUI(false);
       setStimUI(false);
@@ -465,12 +645,15 @@
 
   startBtn.addEventListener("click", async () => {
     try {
-      clearTimeout(autoStopTimer);
-      autoStopTimer = null;
+      refreshControls();
 
       const amp_mA = getAmp_mA();
-      const pw_us  = getPW_us();
+      const pw_us = getPW_us();
       const freq_hz = getFreq_Hz();
+      const dutyPct = getDuty_pct();
+      const totalDurationSec = getDur_s();
+      const periodSec = getPeriod_s();
+
       const pkt = encodePacket(amp_mA, pw_us, freq_hz);
 
       const metric = amp_mA * pw_us;
@@ -478,18 +661,7 @@
         log(`WARN: strong settings (amp*pw=${metric.toFixed(1)} > ${STRONG_THRESHOLD})`);
       }
 
-      await writeBytes(pkt);
-      setStimUI(true);
-
-      const seconds = getDur_s();
-      if (Number.isFinite(seconds) && seconds > 0) {
-        autoStopTimer = setTimeout(() => {
-          stopStim().then(() => log("Auto stop triggered after " + seconds.toFixed(1) + " seconds."))
-                    .catch(e => log("Auto-stop error: " + e));
-        }, Math.floor(seconds * 1000));
-      }
-
-      await tryReadAndLogReply();
+      await startDutyCycledRun(pkt, totalDurationSec, dutyPct, periodSec);
 
     } catch (err) {
       log("Start error: " + err);
@@ -499,7 +671,7 @@
 
   stopBtn.addEventListener("click", async () => {
     try {
-      await stopStim();
+      await stopStim("Stopped by user.");
     } catch (err) {
       log("Stop error: " + err);
     }
